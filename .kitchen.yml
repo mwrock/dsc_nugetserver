@@ -1,0 +1,21 @@
+---
+driver:
+  name: vagrant
+
+provisioner:
+  name: chef_zero
+
+platforms:
+  - name: windows-8.1
+    transport:
+      name: winrm
+    driver:
+      guest: :windows
+      box: mwrock/Windows8.1-amd64
+      provider: hyperv
+
+suites:
+  - name: default
+    run_list:
+      - recipe[ftp_server::default]
+    attributes:
