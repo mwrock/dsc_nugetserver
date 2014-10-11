@@ -1,61 +1,66 @@
-remote_file "#{ENV['temp']}/filezilla.exe" do
-  source 'http://downloads.sourceforge.net/project/filezilla/FileZilla%20Server/0.9.46/FileZilla_Server-0_9_46.exe'
+include_recipe "dsc_nugetserver::resource_kit"
+
+powershell_script "set execution policy" do
+  code "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Force"
 end
 
-# dsc_script "filezilla package" do
-#   code <<-EOH
-#     Package Filezilla
-#     {
-#       Ensure = "Present"
-#       Name="FileZilla Server"
-#       Path="#{ENV['temp']}/filezilla.exe"
-#       ProductId=''
-#       Arguments="/S "
-#     }
-#   EOH
-# end
-
-windows_package 'filezilla' do
-  source "#{ENV['temp']}/filezilla.exe"
-  action :install
-end
-
-install_path = "#{ENV['ProgramFiles']}\\FileZilla Server"
-
-powershell_script 'FileZilla Firewall Rule' do
-  code <<-EOS
-    New-NetFirewallRule -DisplayName "FileZilla Server" -Direction Inbound -LocalPort Any -Protocol TCP -Action Allow -EdgeTraversalPolicy Block -Program "#{install_path}\\FileZilla Server.exe"
-
-EOS
-  guard_interpreter :powershell_script
-  not_if "Get-NetFirewallRule -DisplayName \"FileZilla Server\"; return $?"
-end
-
-dsc_script "user" do
+dsc_script  "webroot" do
   code <<-EOH
-    User FTPUser
+    File webroot
     {
-      UserName="FTPUser"
-    }
-  EOH
-end
-
-dsc_script "group" do
-  code <<-EOH
-    Group administrators
-    {
-      GroupName="administrators"
-      MembersToInclude="FTPUser"
-    }
-  EOH
-end
-
-dsc_script  "ftproot" do
-  code <<-EOH
-    File ftproot
-    {
-      DestinationPath="C:\\FtpRoot"
+      DestinationPath="C:\\web"
       Type="Directory"
     }
   EOH
+end
+
+cookbook_file "NugetServer.zip" do
+  path "#{Chef::Config[:file_cache_path]}\\NugetServer.zip"
+  action :create_if_missing
+end
+
+dsc_script 'nuget web root' do
+  code <<-EOH
+    Archive nugetserver
+    {
+      ensure = 'Present'
+      path = "#{Chef::Config[:file_cache_path]}\\NugetServer.zip"
+      destination = "c:\\web"
+    }
+  EOH
+end
+
+%w{IIS-WebServerRole IIS-ISAPIFilter IIS-ISAPIExtensions NetFx4Extended-ASPNET45 IIS-NetFxExtensibility45 IIS-ASPNet45 }.each do |feature|
+  dsc_resource feature do
+    resource_name :xwindowsoptionalfeature
+    property :name, feature
+    property :nowindowsupdatecheck, true
+    property :ensure, "Enable"
+  end
+end
+
+dsc_resource "Remove default site" do
+  resource_name :xwebsite
+  property :name, "Default Web Site"
+  property :ensure, "Absent"
+  property :physicalpath, "c:\\inetpub\\wwwroot"
+end
+
+dsc_resource "Add Nuget site" do
+  resource_name :xwebsite
+  property :name, "NugetServer"
+  property :ensure, "Present"
+  property :state, "Started"
+  property :physicalpath, "c:\\web\\NugetServer"
+end
+
+dsc_resource "http firewall rule" do
+  resource_name :xfirewall
+  property :name, "http"
+  property :ensure, "Present"
+  property :state, "Enabled"
+  property :direction, "Inbound"
+  property :access, "Allow"
+  property :protocol, "TCP"
+  property :localport, "80"
 end

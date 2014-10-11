@@ -17,5 +17,5 @@ platforms:
 suites:
   - name: default
     run_list:
-      - recipe[ftp_server::default]
+      - recipe[dsc_nugetserver::default]
     attributes:
