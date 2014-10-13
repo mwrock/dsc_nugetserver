@@ -1,7 +1,12 @@
 include_recipe "dsc_nugetserver::resource_kit"
 
 powershell_script "set execution policy" do
-  code "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Force"
+  code <<-EOH
+    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Force
+    if(Test-Path "$env:SystemRoot\\SysWOW64") {
+      Start-Process "$env:SystemRoot\\SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe" -verb runas -wait -argumentList "-noprofile -WindowStyle hidden -noninteractive -ExecutionPolicy bypass -Command `"Set-ExecutionPolicy RemoteSigned`""
+    }
+    EOH
 end
 
 dsc_script  "webroot" do
