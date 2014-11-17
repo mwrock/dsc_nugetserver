@@ -12,7 +12,6 @@ platforms:
     driver:
       guest: :windows
       box: mwrock/Windows8.1-amd64
-      provider: hyperv
 
 suites:
   - name: default
